@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>원격연수 이수 현황 관리</title>
+<style>
+:root{
+  --bg:#ffffff;--bg2:#f7f7f5;--bg3:#f0efe9;
+  --text:#1a1a18;--text2:#6b6b65;--text3:#a0a09a;
+  --border:rgba(0,0,0,0.1);--border2:rgba(0,0,0,0.2);
+  --ok-bg:#eaf3de;--ok-text:#3b6d11;
+  --bad-bg:#fcebeb;--bad-text:#a32d2d;
+  --warn-bg:#faeeda;--warn-text:#854f0b;
+  --info-bg:#e6f1fb;--info-text:#185fa5;
+  --r:8px;--rl:12px;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#1c1c1a;--bg2:#242422;--bg3:#2c2c2a;
+    --text:#f0efeb;--text2:#a0a09a;--text3:#6b6b65;
+    --border:rgba(255,255,255,0.1);--border2:rgba(255,255,255,0.2);
+    --ok-bg:#173404;--ok-text:#c0dd97;
+    --bad-bg:#501313;--bad-text:#f09595;
+    --warn-bg:#412402;--warn-text:#fac775;
+    --info-bg:#042c53;--info-text:#85b7eb;
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;background:var(--bg3);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5}
+
+/* 로그인 */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1rem}
+.login-card{background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--rl);padding:2.5rem 2rem;width:min(360px,100%);text-align:center}
+.login-icon{font-size:42px;margin-bottom:.75rem}
+.login-card h1{font-size:18px;font-weight:700;margin-bottom:.35rem}
+.login-card p{font-size:13px;color:var(--text2);margin-bottom:1.5rem}
+.login-card input{width:100%;padding:11px 14px;font-size:15px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--bg2);color:var(--text);margin-bottom:.75rem;letter-spacing:3px;text-align:center}
+.login-card input:focus{outline:2px solid var(--info-text);outline-offset:1px}
+.login-err{font-size:12px;color:var(--bad-text);margin-bottom:.6rem;min-height:16px}
+
+/* 앱 레이아웃 */
+#app{display:none;max-width:1100px;margin:0 auto;padding:1rem 1rem 4rem}
+.top-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:10px}
+.logo{font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px}
+.sync-pill{font-size:11px;padding:3px 10px;border-radius:20px;background:var(--ok-bg);color:var(--ok-text);display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.sync-pill.syncing{background:var(--warn-bg);color:var(--warn-text)}
+.sync-pill.error{background:var(--bad-bg);color:var(--bad-text)}
+
+/* 버튼 */
+.btn{padding:7px 14px;font-size:13px;cursor:pointer;border-radius:var(--r);border:0.5px solid var(--border2);background:var(--bg);color:var(--text);display:inline-flex;align-items:center;gap:5px;white-space:nowrap;transition:background .15s;font-family:inherit}
+.btn:hover{background:var(--bg2)}
+.btn.primary{background:var(--text);color:var(--bg);border-color:var(--text)}
+.btn.primary:hover{opacity:.82}
+.btn.sm{padding:3px 9px;font-size:12px}
+.btn.danger{border-color:var(--bad-text);color:var(--bad-text)}
+.btn.danger:hover{background:var(--bad-bg)}
+.btn-row{display:flex;gap:7px;flex-wrap:wrap}
+
+/* 통계 */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:1.25rem}
+.stat{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r);padding:.75rem 1rem}
+.stat-label{font-size:11px;color:var(--text2);margin-bottom:3px}
+.stat-value{font-size:22px;font-weight:700}
+.stat-value.ok{color:var(--ok-text)}
+.stat-value.bad{color:var(--bad-text)}
+
+/* 탭 */
+.tabs{display:flex;border-bottom:0.5px solid var(--border2);margin-bottom:1.1rem;gap:2px}
+.tab{padding:7px 16px;font-size:13px;background:none;border:none;border-bottom:2px solid transparent;color:var(--text2);cursor:pointer;font-family:inherit}
+.tab.active{color:var(--text);border-bottom-color:var(--text);font-weight:700}
+
+/* 컨트롤 */
+.controls{display:flex;gap:7px;margin-bottom:.85rem;flex-wrap:wrap}
+.ctrl-input{font-size:13px;padding:6px 10px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--bg);color:var(--text);font-family:inherit}
+.ctrl-input.flex1{flex:1;min-width:130px}
+
+/* 카드·테이블 */
+.card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--rl);overflow:hidden;margin-bottom:1rem}
+.card-pad{padding:1.25rem}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px 12px;font-size:11px;font-weight:700;color:var(--text2);border-bottom:0.5px solid var(--border);white-space:nowrap}
+td{padding:8px 12px;border-bottom:0.5px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg2)}
+
+/* 배지 */
+.badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700}
+.badge.ok{background:var(--ok-bg);color:var(--ok-text)}
+.badge.bad{background:var(--bad-bg);color:var(--bad-text)}
+.badge.na{background:var(--bg2);color:var(--text2)}
+.badge.info{background:var(--info-bg);color:var(--info-text)}
+
+/* 진행바 */
+.prog{display:flex;align-items:center;gap:8px}
+.prog-bar{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;min-width:60px}
+.prog-fill{height:100%;border-radius:3px;background:var(--ok-text)}
+.prog-fill.med{background:var(--warn-text)}
+.prog-fill.low{background:var(--bad-text)}
+.prog-pct{font-size:11px;color:var(--text2);min-width:30px;text-align:right}
+
+/* 뷰 */
+.view{display:none}
+.view.active{display:block}
+.back-row{margin-bottom:1rem}
+
+/* 업로드 */
+.upload-zone{border:1.5px dashed var(--border2);border-radius:var(--rl);padding:2rem;text-align:center;cursor:pointer;transition:background .15s}
+.upload-zone:hover,.upload-zone.drag{background:var(--bg2)}
+.upload-zone .uicon{font-size:36px;margin-bottom:.5rem}
+.upload-zone p{font-size:13px;color:var(--text2)}
+.upload-zone p.sm{font-size:11px;margin-top:4px}
+.log-box{margin-top:.75rem;font-size:12px;color:var(--text2);max-height:160px;overflow-y:auto;line-height:1.9}
+
+/* 폼 */
+.form-row{margin-bottom:.75rem}
+.form-row label{display:block;font-size:11px;color:var(--text2);margin-bottom:3px}
+.form-row input,.form-row select,.form-row textarea{width:100%;padding:8px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--bg2);color:var(--text);font-family:inherit}
+.form-row textarea{resize:vertical;min-height:60px}
+.form-footer{display:flex;gap:7px;justify-content:flex-end;padding-top:.75rem;border-top:0.5px solid var(--border);margin-top:.75rem}
+
+/* 매트릭스 */
+.matrix-wrap{overflow-x:auto}
+.mtable{font-size:11px;border-collapse:collapse}
+.mtable th.rot{writing-mode:vertical-rl;transform:rotate(180deg);min-width:20px;max-width:20px;font-size:9px;padding:3px 1px;white-space:nowrap;font-weight:600;color:var(--text2)}
+.mtable th.name-col{min-width:70px;font-size:11px;position:sticky;left:0;background:var(--bg);z-index:2}
+.mtable td.name-col{position:sticky;left:0;background:var(--bg);font-weight:600;font-size:12px;white-space:nowrap;z-index:1}
+.mtable tr:hover td{background:var(--bg2)}
+.mtable tr:hover td.name-col{background:var(--bg2)}
+.mdot{width:12px;height:12px;border-radius:2px;margin:auto}
+
+/* 직급 인라인 수정 */
+.pos-view{display:inline-flex;align-items:center;gap:4px}
+.pos-form{display:none;align-items:center;gap:4px}
+.pos-form select{font-size:12px;padding:2px 5px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--bg);color:var(--text);font-family:inherit}
+
+/* 스피너 */
+.spinner{display:inline-block;width:13px;height:13px;border:2px solid var(--border2);border-top-color:var(--text);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* 토스트 */
+#toastArea{position:fixed;bottom:1.25rem;right:1.25rem;display:flex;flex-direction:column;gap:6px;z-index:999}
+.toast{background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--r);padding:.65rem 1rem;font-size:12px;display:flex;align-items:center;gap:8px;animation:fadeUp .2s;min-width:200px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* 연수 목록 관리 */
+.training-list-item{display:flex;align-items:flex-start;gap:8px;padding:.75rem 0;border-bottom:0.5px solid var(--border)}
+.training-list-item:last-child{border-bottom:none}
+.training-info{flex:1}
+.training-name{font-size:13px;font-weight:600;margin-bottom:2px}
+.training-meta{font-size:11px;color:var(--text2)}
+.checkbox-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:4px 8px;margin-top:6px}
+.checkbox-grid label{font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--text2)}
+.checkbox-grid input[type=checkbox]{cursor:pointer}
+
+@media(max-width:600px){
+  .top-bar{flex-direction:column;align-items:flex-start}
+  .stats{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ 로그인 ══ -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-card">
+    <div class="login-icon">🏫</div>
+    <h1>원격연수 이수 현황</h1>
+    <p>접근하려면 비밀번호를 입력하세요</p>
+    <input type="password" id="pwInput" placeholder="비밀번호" onkeydown="if(event.key==='Enter')tryLogin()">
+    <div class="login-err" id="loginErr"></div>
+    <button class="btn primary" style="width:100%;justify-content:center;padding:11px" onclick="tryLogin()">입장</button>
+  </div>
+</div>
+
+<!-- ══ 앱 ══ -->
+<div id="app">
+  <div class="top-bar">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div class="logo">🏫 원격연수 이수 현황</div>
+      <span class="sync-pill" id="syncPill">● 연결됨</span>
+    </div>
+    <div class="btn-row">
+      <button class="btn" onclick="showView('addStaff')">+ 교직원 추가</button>
+      <button class="btn" onclick="showView('manageTraining')">📋 연수 목록 관리</button>
+      <button class="btn primary" onclick="showView('upload')">↑ 이수증 업로드</button>
+    </div>
+  </div>
+
+  <div class="stats" id="statsRow"></div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('Staff',this)">교직원별</button>
+    <button class="tab" onclick="switchTab('Training',this)">연수별</button>
+    <button class="tab" onclick="switchTab('Matrix',this)">전체 매트릭스</button>
+  </div>
+
+  <!-- 교직원별 -->
+  <div class="view active" id="viewStaff">
+    <div class="controls">
+      <input type="text" class="ctrl-input flex1" id="staffSearch" placeholder="이름 검색..." oninput="renderStaff()">
+      <select class="ctrl-input" id="staffFilter" onchange="renderStaff()">
+        <option value="all">전체</option>
+        <option value="incomplete">미완료 있음</option>
+        <option value="complete">전체 이수</option>
+      </select>
+      <select class="ctrl-input" id="posFilter" onchange="renderStaff()">
+        <option value="all">직급 전체</option>
+      </select>
+    </div>
+    <div class="card"><table id="staffTable"></table></div>
+  </div>
+
+  <!-- 연수별 -->
+  <div class="view" id="viewTraining">
+    <div class="controls">
+      <select class="ctrl-input" id="catFilter" onchange="renderTraining()">
+        <option value="all">분류 전체</option>
+        <option value="청렴">청렴·윤리</option>
+        <option value="성">성교육</option>
+        <option value="안전">안전·생명</option>
+        <option value="기타">기타</option>
+      </select>
+    </div>
+    <div class="card"><table id="trainingTable"></table></div>
+  </div>
+
+  <!-- 매트릭스 -->
+  <div class="view" id="viewMatrix">
+    <div class="controls">
+      <input type="text" class="ctrl-input flex1" id="matrixSearch" placeholder="이름 검색..." oninput="renderMatrix()">
+    </div>
+    <p style="font-size:11px;color:var(--text2);margin-bottom:.6rem">
+      <span style="display:inline-block;width:12px;height:12px;background:var(--ok-bg);border-radius:2px;vertical-align:middle;margin-right:4px"></span>이수
+      <span style="display:inline-block;width:12px;height:12px;background:var(--bad-bg);border-radius:2px;vertical-align:middle;margin:0 4px 0 12px"></span>미이수
+      <span style="display:inline-block;width:12px;height:12px;background:var(--bg2);border-radius:2px;vertical-align:middle;margin:0 4px 0 12px"></span>해당없음
+    </p>
+    <div class="card" style="padding:.5rem"><div class="matrix-wrap"><div id="matrixWrap"></div></div></div>
+  </div>
+
+  <!-- 교직원 상세 -->
+  <div class="view" id="viewDetail">
+    <div class="back-row"><button class="btn" onclick="showMainTab()">← 돌아가기</button></div>
+    <div id="detailContent"></div>
+  </div>
+
+  <!-- 이수증 업로드 -->
+  <div class="view" id="viewUpload">
+    <div class="back-row"><button class="btn" onclick="showMainTab()">← 돌아가기</button></div>
+    <div class="card card-pad" style="max-width:620px">
+      <h2 style="font-size:15px;font-weight:700;margin-bottom:1rem">이수증 PDF 업로드</h2>
+      <div class="upload-zone" id="uploadZone"
+        onclick="document.getElementById('fileInput').click()"
+        ondragover="event.preventDefault();this.classList.add('drag')"
+        ondragleave="this.classList.remove('drag')"
+        ondrop="handleDrop(event)">
+        <div class="uicon">📄</div>
+        <p>이수증 PDF를 클릭하거나 드래그하세요</p>
+        <p class="sm">여러 파일 동시 업로드 가능 · AI가 자동으로 내용을 인식합니다</p>
+        <input type="file" id="fileInput" accept=".pdf" multiple style="display:none" onchange="handleFiles(this.files)">
+      </div>
+      <div class="log-box" id="uploadLog"></div>
+    </div>
+  </div>
+
+  <!-- 교직원 추가 -->
+  <div class="view" id="viewAddStaff">
+    <div class="back-row"><button class="btn" onclick="showMainTab()">← 돌아가기</button></div>
+    <div class="card card-pad" style="max-width:400px">
+      <h2 style="font-size:15px;font-weight:700;margin-bottom:1rem">교직원 추가</h2>
+      <div class="form-row"><label>이름 *</label><input id="sName" placeholder="홍길동" onkeydown="if(event.key==='Enter')addStaff()"></div>
+      <div class="form-row"><label>직급 *</label>
+        <select id="sPos">
+          <option>교장</option><option>교감</option><option selected>교사</option>
+          <option>기간제교사</option><option>교육행정직</option><option>교육공무직</option>
+          <option>조리사</option><option>조리실무사</option><option>방호원</option>
+        </select>
+      </div>
+      <div class="form-footer">
+        <button class="btn" onclick="showMainTab()">취소</button>
+        <button class="btn primary" onclick="addStaff()">추가</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 연수 목록 관리 -->
+  <div class="view" id="viewManageTraining">
+    <div class="back-row"><button class="btn" onclick="showMainTab()">← 돌아가기</button></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
+      <h2 style="font-size:16px;font-weight:700">연수 목록 관리</h2>
+      <button class="btn primary" onclick="showView('addTraining')">+ 연수 추가</button>
+    </div>
+    <div class="card card-pad">
+      <div id="trainingListEdit"></div>
+    </div>
+  </div>
+
+  <!-- 연수 추가 -->
+  <div class="view" id="viewAddTraining">
+    <div class="back-row"><button class="btn" onclick="showView('manageTraining')">← 연수 목록으로</button></div>
+    <div class="card card-pad" style="max-width:560px">
+      <h2 style="font-size:15px;font-weight:700;margin-bottom:1rem">연수 추가</h2>
+      <div class="form-row"><label>연수명 (전체) *</label><input id="tName" placeholder="예: 개인정보보호 교육"></div>
+      <div class="form-row"><label>줄임말 (매트릭스용) *</label><input id="tShort" placeholder="예: 개인정보보호" maxlength="10"></div>
+      <div class="form-row"><label>분류</label>
+        <select id="tCat">
+          <option value="청렴">청렴·윤리</option>
+          <option value="성">성교육</option>
+          <option value="안전">안전·생명</option>
+          <option value="기타" selected>기타</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>이수 대상 직급 (복수 선택)</label>
+        <div class="checkbox-grid" id="targetGrid"></div>
+      </div>
+      <div class="form-footer">
+        <button class="btn" onclick="showView('manageTraining')">취소</button>
+        <button class="btn primary" onclick="addTraining()">추가</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toastArea"></div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<!-- PDF.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+<script>
+/* ════════════════════════════════════════════════
+   ★ 설정 영역 — 이 두 가지만 채우면 됩니다 ★
+   ════════════════════════════════════════════════ */
+const APP_PASSWORD = "5301";       // ← 비밀번호 변경
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCQHfoU8ZS99z514uQb9cp6m0mUOqzLJTI",
+  authDomain: "school-training-d94cf.firebaseapp.com",
+  databaseURL: "https://school-training-d94cf-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "school-training-d94cf",
+  storageBucket: "school-training-d94cf.firebasestorage.app",
+  messagingSenderId: "127950842528",
+  appId: "1:127950842528:web:2edc4e10ffeb2819bc77c5"
+};
+/* ════════════════════════════════════════════════ */
+
+const POS_LIST = ["교장","교감","교사","기간제교사","교육행정직","교육공무직","조리사","조리실무사","방호원"];
+const CAT_LABEL = {청렴:"청렴·윤리",성:"성교육",안전:"안전·생명",기타:"기타"};
+
+const DEFAULT_TRAININGS = [
+  {id:"t1",name:"청렴교육 (청탁금지법·이해충돌·행동강령·부패방지·갑질근절)",short:"청렴교육",cat:"청렴",target:["교장","교감","교사","기간제교사","교육행정직","교육공무직","조리사","조리실무사","방호원"]},
+  {id:"t2",name:"적극행정 교육",short:"적극행정",cat:"기타",target:["교장","교감","교사","교육행정직"]},
+  {id:"t3",name:"성희롱 예방교육",short:"성희롱예방",cat:"성",target:["교장","교감","교사","기간제교사","교육행정직","교육공무직","조리사","조리실무사","방호원"]},
+  {id:"t4",name:"성매매 예방교육",short:"성매매예방",cat:"성",target:["교장","교감","교사","기간제교사","교육행정직","교육공무직","조리사","조리실무사","방호원"]},
+  {id:"t5",name:"성폭력 예방교육",short:"성폭력예방",cat:"성",target:["교장","교감","교사","기간제교사","교육행정직","교육공무직","조리사","조리실무사","방호원"]},
+  {id:"t6",name:"심폐소생술 및 응급처치교육",short:"심폐소생술",cat:"안전",target:["교장","교감","교사","기간제교사","교육행정직"]},
+  {id:"t7",name:"안전교육",short:"안전교육",cat:"안전",target:["교장","교감","교사","기간제교사","교육행정직","교육공무직","조리사","조리실무사","방호원"]},
+  {id:"t8",name:"어린이이용시설종사자 안전교육",short:"어린이안전",cat:"안전",target:["교육공무직","조리사","조리실무사","방호원"]},
+  {id:"t9",name:"교육활동 침해 행위 예방교육",short:"교육활동침해예방",cat:"기타",target:["교장","교감","교사","기간제교사","교육행정직","교육공무직"]},
+  {id:"t10",name:"직장내 괴롭힘 예방 교육",short:"직장내괴롭힘",cat:"기타",target:["교장","교감","교사","기간제교사","교육행정직","교육공무직","조리사","조리실무사","방호원"]},
+  {id:"t11",name:"선행교육예방 학교자체연수",short:"선행교육예방",cat:"기타",target:["교장","교감","교사","기간제교사"]},
+  {id:"t12",name:"사회적 장애인식개선교육",short:"장애인식개선",cat:"기타",target:["교장","교감","교사","기간제교사","교육행정직","교육공무직","조리사","조리실무사","방호원"]},
+  {id:"t13",name:"개인정보보호 교육",short:"개인정보보호",cat:"기타",target:["교장","교감","교사","기간제교사","교육행정직","교육공무직","조리사","조리실무사","방호원"]},
+  {id:"t14",name:"정보보안 교육",short:"정보보안",cat:"기타",target:["교장","교감","교사","기간제교사","교육행정직","교육공무직"]},
+  {id:"t15",name:"소프트웨어 관리교육",short:"SW관리",cat:"기타",target:["교장","교감","교사","기간제교사","교육행정직","교육공무직"]},
+  {id:"t16",name:"인성교육",short:"인성교육",cat:"기타",target:["교장","교감","교사","기간제교사"]},
+  {id:"t17",name:"다문화교육",short:"다문화교육",cat:"기타",target:["교장","교감","교사","기간제교사"]},
+  {id:"t18",name:"학교폭력예방교육",short:"학교폭력예방",cat:"기타",target:["교장","교감","교사","기간제교사","교육행정직","교육공무직"]},
+  {id:"t19",name:"가정폭력 예방교육",short:"가정폭력예방",cat:"성",target:["교장","교감","교사","기간제교사","교육행정직","교육공무직","조리사","조리실무사","방호원"]},
+  {id:"t20",name:"아동학대 예방교육 및 신고의무자교육",short:"아동학대예방",cat:"기타",target:["교장","교감","교사","기간제교사","교육행정직","교육공무직"]},
+  {id:"t21",name:"긴급복지 신고의무자 교육",short:"긴급복지신고",cat:"기타",target:["교장","교감","교사","기간제교사","교육행정직","교육공무직"]},
+  {id:"t22",name:"직장내 장애인 인식개선 교육",short:"직장내장애인",cat:"기타",target:["기간제교사","교육공무직","조리사","조리실무사","방호원"]},
+  {id:"t23",name:"장애인학대 신고의무자 교육",short:"장애인학대신고",cat:"기타",target:["교장","교감","교사","기간제교사","교육행정직","교육공무직"]},
+  {id:"t24",name:"교직원 생명지킴이 교육",short:"생명지킴이",cat:"안전",target:["교장","교감","교사","기간제교사","교육행정직","교육공무직"]},
+  {id:"t25",name:"생명존중 및 자살예방교육",short:"자살예방교육",cat:"안전",target:["교장","교감","교사","기간제교사","교육행정직","교육공무직"]},
+  {id:"t26",name:"정보공개제도 교육",short:"정보공개교육",cat:"기타",target:["교장","교감","교사","기간제교사","교육행정직","교육공무직","조리사","조리실무사","방호원"]},
+];
+
+/* ── Firebase 초기화 ── */
+let db = null;
+let dbRef = null;
+const isConfigured = FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY";
+
+if (isConfigured) {
+  try {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.database();
+    dbRef = db.ref("traintrack");
+  } catch(e) { console.error("Firebase 초기화 실패:", e); }
+}
+
+/* ── 상태 ── */
+let state = { staff: [], completions: {}, trainings: [] };
+let currentMainTab = "Staff";
+let unsubscribe = null;
+
+/* ── 로그인 ── */
+function tryLogin() {
+  const pw = document.getElementById("pwInput").value;
+  if (pw === APP_PASSWORD) {
+    document.getElementById("loginWrap").style.display = "none";
+    document.getElementById("app").style.display = "block";
+    initData();
+  } else {
+    document.getElementById("loginErr").textContent = "비밀번호가 올바르지 않습니다";
+    document.getElementById("pwInput").value = "";
+    document.getElementById("pwInput").focus();
+  }
+}
+
+/* ── 데이터 초기화 & Firebase 실시간 동기화 ── */
+function initData() {
+  if (!isConfigured || !dbRef) {
+    setSyncState("error");
+    // Firebase 미설정 시 로컬 스토리지 폴백
+    try {
+      const saved = localStorage.getItem("traintrack_local");
+      if (saved) state = JSON.parse(saved);
+      else state.trainings = [...DEFAULT_TRAININGS];
+    } catch(e) { state.trainings = [...DEFAULT_TRAININGS]; }
+    renderAll();
+    showToast("Firebase 미설정 — 로컬 저장 모드로 동작합니다","warn");
+    return;
+  }
+  setSyncState("syncing");
+  // 최초 로드
+  dbRef.once("value").then(snap => {
+    const data = snap.val();
+    if (data) {
+      state.staff = data.staff || [];
+      state.completions = data.completions || {};
+      state.trainings = data.trainings && data.trainings.length > 0
+        ? data.trainings : [...DEFAULT_TRAININGS];
+    } else {
+      state.trainings = [...DEFAULT_TRAININGS];
+      // 초기 데이터 저장
+      dbRef.set({ staff: [], completions: {}, trainings: DEFAULT_TRAININGS });
+    }
+    renderAll();
+    setSyncState("ok");
+  }).catch(e => {
+    setSyncState("error");
+    state.trainings = [...DEFAULT_TRAININGS];
+    renderAll();
+    showToast("Firebase 연결 실패: " + e.message, "bad");
+  });
+  // 실시간 리스너
+  if (unsubscribe) unsubscribe();
+  const listener = dbRef.on("value", snap => {
+    const data = snap.val();
+    if (!data) return;
+    state.staff = data.staff || [];
+    state.completions = data.completions || {};
+    state.trainings = data.trainings && data.trainings.length > 0
+      ? data.trainings : [...DEFAULT_TRAININGS];
+    renderAll();
+    setSyncState("ok");
+  }, err => { setSyncState("error"); });
+  unsubscribe = () => dbRef.off("value", listener);
+}
+
+async function saveData() {
+  setSyncState("syncing");
+  if (!isConfigured || !dbRef) {
+    try { localStorage.setItem("traintrack_local", JSON.stringify(state)); } catch(e) {}
+    setSyncState("ok");
+    return;
+  }
+  try {
+    await dbRef.set({
+      staff: state.staff,
+      completions: state.completions,
+      trainings: state.trainings
+    });
+    setSyncState("ok");
+  } catch(e) {
+    setSyncState("error");
+    showToast("저장 실패: " + e.message, "bad");
+  }
+}
+
+function setSyncState(s) {
+  const p = document.getElementById("syncPill");
+  if (s === "ok")      { p.className = "sync-pill"; p.textContent = "● 연결됨"; }
+  if (s === "syncing") { p.className = "sync-pill syncing"; p.innerHTML = '<span class="spinner"></span> 동기화 중'; }
+  if (s === "error")   { p.className = "sync-pill error"; p.textContent = "● 오프라인"; }
+}
+
+/* ── 헬퍼 ── */
+function getApplicable(person) {
+  return state.trainings.filter(t => (t.target||[]).includes(person.pos));
+}
+function isDone(pid, tid) {
+  return !!(state.completions[pid] && state.completions[pid][tid]);
+}
+function getRate(person) {
+  const a = getApplicable(person);
+  if (!a.length) return 100;
+  return Math.round(a.filter(t => isDone(person.id, t.id)).length / a.length * 100);
+}
+function progClass(r) { return r >= 80 ? "" : r >= 50 ? " med" : " low"; }
+
+/* ── 통계 ── */
+function renderStats() {
+  const total = state.staff.length;
+  const full = state.staff.filter(p => getRate(p) === 100).length;
+  const totalDone = Object.values(state.completions).reduce((s,o) => s + Object.values(o).filter(Boolean).length, 0);
+  document.getElementById("statsRow").innerHTML = `
+    <div class="stat"><div class="stat-label">전체 교직원</div><div class="stat-value">${total}명</div></div>
+    <div class="stat"><div class="stat-label">이수 완료</div><div class="stat-value ok">${full}명</div></div>
+    <div class="stat"><div class="stat-label">미완료</div><div class="stat-value${total-full>0?' bad':''}">${total-full}명</div></div>
+    <div class="stat"><div class="stat-label">총 이수 건수</div><div class="stat-value">${totalDone}건</div></div>
+  `;
+}
+
+/* ── 교직원별 ── */
+function renderStaff() {
+  const q = document.getElementById("staffSearch").value.toLowerCase();
+  const f = document.getElementById("staffFilter").value;
+  const pf = document.getElementById("posFilter").value;
+  const list = state.staff.filter(s => {
+    if (q && !s.name.toLowerCase().includes(q)) return false;
+    if (pf !== "all" && s.pos !== pf) return false;
+    const r = getRate(s);
+    if (f === "complete" && r < 100) return false;
+    if (f === "incomplete" && r >= 100) return false;
+    return true;
+  });
+  const rows = list.map(s => {
+    const r = getRate(s);
+    const a = getApplicable(s);
+    const done = a.filter(t => isDone(s.id, t.id)).length;
+    return `<tr>
+      <td style="font-weight:700">${s.name}</td>
+      <td>
+        <span class="pos-view" id="pv-${s.id}">
+          <span>${s.pos}</span>
+          <button class="btn sm" onclick="startEditPos('${s.id}')" title="직급 수정">✏</button>
+        </span>
+        <span class="pos-form" id="pf-${s.id}">
+          <select id="ps-${s.id}">${POS_LIST.map(p=>`<option${p===s.pos?' selected':''}>${p}</option>`).join('')}</select>
+          <button class="btn sm primary" onclick="savePos('${s.id}')">저장</button>
+          <button class="btn sm" onclick="cancelPos('${s.id}')">✕</button>
+        </span>
+      </td>
+      <td><div class="prog"><div class="prog-bar"><div class="prog-fill${progClass(r)}" style="width:${r}%"></div></div><span class="prog-pct">${r}%</span></div></td>
+      <td style="color:var(--text2);font-size:12px">${done}/${a.length}</td>
+      <td><button class="btn sm" onclick="openDetail('${s.id}')">상세 보기</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById("staffTable").innerHTML = `
+    <thead><tr><th>이름</th><th>직급</th><th style="min-width:140px">이수율</th><th>이수/대상</th><th></th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="5" style="text-align:center;padding:1.5rem;color:var(--text2)">해당하는 교직원이 없습니다</td></tr>'}</tbody>
+  `;
+}
+function populatePosFilter() {
+  const pos = [...new Set(state.staff.map(s=>s.pos))].sort();
+  const sel = document.getElementById("posFilter");
+  const cur = sel.value;
+  sel.innerHTML = '<option value="all">직급 전체</option>' + pos.map(p=>`<option${p===cur?' selected':''}>${p}</option>`).join('');
+}
+function startEditPos(id) {
+  document.getElementById("pv-"+id).style.display = "none";
+  document.getElementById("pf-"+id).style.display = "inline-flex";
+}
+function cancelPos(id) {
+  document.getElementById("pv-"+id).style.display = "inline-flex";
+  document.getElementById("pf-"+id).style.display = "none";
+}
+async function savePos(id) {
+  const p = state.staff.find(s=>s.id===id);
+  if (!p) return;
+  p.pos = document.getElementById("ps-"+id).value;
+  await saveData();
+  renderAll();
+  showToast(`${p.name} 직급 변경 완료`,"ok");
+}
+
+/* ── 연수별 ── */
+function renderTraining() {
+  const cat = document.getElementById("catFilter").value;
+  const list = state.trainings.filter(t => cat === "all" || t.cat === cat);
+  const rows = list.map(t => {
+    const app = state.staff.filter(p => getApplicable(p).find(x => x.id === t.id));
+    const done = app.filter(p => isDone(p.id, t.id)).length;
+    const r = app.length > 0 ? Math.round(done/app.length*100) : 0;
+    return `<tr>
+      <td style="font-size:13px">${t.name}</td>
+      <td><span class="badge info">${CAT_LABEL[t.cat]||t.cat}</span></td>
+      <td style="color:var(--text2)">${app.length}명</td>
+      <td><div class="prog"><div class="prog-bar"><div class="prog-fill${progClass(r)}" style="width:${r}%"></div></div><span class="prog-pct">${r}%</span></div></td>
+      <td style="color:var(--text2);font-size:12px">${done}/${app.length}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById("trainingTable").innerHTML = `
+    <thead><tr><th>연수명</th><th>분류</th><th>대상</th><th style="min-width:130px">이수율</th><th>이수/대상</th></tr></thead>
+    <tbody>${rows}</tbody>
+  `;
+}
+
+/* ── 매트릭스 ── */
+function renderMatrix() {
+  const q = document.getElementById("matrixSearch").value.toLowerCase();
+  const list = state.staff.filter(s => !q || s.name.toLowerCase().includes(q));
+  if (!list.length) {
+    document.getElementById("matrixWrap").innerHTML = '<p style="text-align:center;padding:2rem;color:var(--text2);font-size:13px">교직원이 없습니다</p>';
+    return;
+  }
+  const hdrs = `<th class="name-col">이름</th>` +
+    state.trainings.map(t => `<th class="rot" title="${t.name}">${t.short}</th>`).join('');
+  const rows = list.map(s =>
+    `<tr><td class="name-col">${s.name}<br><span style="font-size:10px;color:var(--text2)">${s.pos}</span></td>` +
+    state.trainings.map(t => {
+      const app = getApplicable(s).find(x => x.id === t.id);
+      if (!app) return `<td><div class="mdot" style="background:var(--bg2)" title="해당없음"></div></td>`;
+      const done = isDone(s.id, t.id);
+      return `<td><div class="mdot" style="background:${done?'var(--ok-bg)':'var(--bad-bg)'}" title="${t.short}: ${done?'이수':'미이수'}"></div></td>`;
+    }).join('') + '</tr>'
+  ).join('');
+  document.getElementById("matrixWrap").innerHTML =
+    `<table class="mtable"><thead><tr>${hdrs}</tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+/* ── 교직원 상세 ── */
+function openDetail(pid) {
+  const p = state.staff.find(s => s.id === pid);
+  if (!p) return;
+  const r = getRate(p);
+  const app = getApplicable(p);
+  const rows = state.trainings.map(t => {
+    const isApp = app.find(x => x.id === t.id);
+    if (!isApp) return `<tr><td style="font-size:12px">${t.name}</td><td><span class="badge na">해당없음</span></td><td></td><td></td></tr>`;
+    const done = isDone(p.id, t.id);
+    const info = state.completions[p.id] && state.completions[p.id][t.id];
+    return `<tr>
+      <td style="font-size:12px">${t.name}</td>
+      <td><span class="badge ${done?'ok':'bad'}">${done?'이수':'미이수'}</span></td>
+      <td style="font-size:11px;color:var(--text2)">${info&&info.date?info.date:''}</td>
+      <td><button class="btn sm" onclick="toggleDone('${p.id}','${t.id}')">${done?'취소':'이수처리'}</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById("detailContent").innerHTML = `
+    <div class="card card-pad">
+      <div class="detail-header">
+        <div>
+          <div class="detail-name">${p.name} <span style="font-size:13px;font-weight:400;color:var(--text2)">${p.pos}</span></div>
+          <div class="detail-sub">이수율 ${r}% · ${app.filter(t=>isDone(p.id,t.id)).length}/${app.length}개</div>
+        </div>
+        <button class="btn danger sm" onclick="removeStaff('${p.id}')">삭제</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table><thead><tr><th>연수명</th><th>상태</th><th>이수일</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+      </div>
+    </div>
+  `;
+  showView("detail");
+}
+async function toggleDone(pid, tid) {
+  if (!state.completions[pid]) state.completions[pid] = {};
+  if (state.completions[pid][tid]) {
+    delete state.completions[pid][tid];
+    showToast("이수 취소됨","warn");
+  } else {
+    const today = new Date().toISOString().slice(0,10);
+    state.completions[pid][tid] = { date: today, method: "manual" };
+    showToast("이수 처리 완료","ok");
+  }
+  await saveData();
+  openDetail(pid);
+}
+async function removeStaff(pid) {
+  if (!confirm("이 교직원을 삭제할까요?")) return;
+  const p = state.staff.find(s=>s.id===pid);
+  state.staff = state.staff.filter(s => s.id !== pid);
+  delete state.completions[pid];
+  await saveData();
+  showMainTab();
+  if (p) showToast(`${p.name} 삭제됨`,"warn");
+}
+
+/* ── 교직원 추가 ── */
+async function addStaff() {
+  const name = document.getElementById("sName").value.trim();
+  const pos = document.getElementById("sPos").value;
+  if (!name) return showToast("이름을 입력해 주세요","warn");
+  if (state.staff.find(s=>s.name===name)) return showToast("이미 등록된 이름입니다","warn");
+  state.staff.push({ id:"s"+Date.now(), name, pos });
+  await saveData();
+  document.getElementById("sName").value = "";
+  showMainTab();
+  showToast(`${name} 교직원 추가 완료`,"ok");
+}
+
+/* ── 연수 목록 관리 렌더 ── */
+function renderTrainingListEdit() {
+  const wrap = document.getElementById("trainingListEdit");
+  if (!state.trainings.length) {
+    wrap.innerHTML = '<p style="color:var(--text2);font-size:13px;text-align:center;padding:1rem">등록된 연수가 없습니다</p>';
+    return;
+  }
+  wrap.innerHTML = state.trainings.map(t => `
+    <div class="training-list-item">
+      <div class="training-info">
+        <div class="training-name">${t.name}</div>
+        <div class="training-meta">
+          <span class="badge info" style="font-size:10px">${CAT_LABEL[t.cat]||t.cat}</span>
+          &nbsp;줄임말: ${t.short} &nbsp;·&nbsp; 대상: ${(t.target||[]).join(', ')||'없음'}
+        </div>
+      </div>
+      <button class="btn sm danger" onclick="removeTraining('${t.id}')">삭제</button>
+    </div>
+  `).join('');
+}
+
+/* ── 연수 추가 폼 ── */
+function initTargetGrid() {
+  document.getElementById("targetGrid").innerHTML = POS_LIST.map(p =>
+    `<label><input type="checkbox" value="${p}" checked> ${p}</label>`
+  ).join('');
+}
+async function addTraining() {
+  const name = document.getElementById("tName").value.trim();
+  const short = document.getElementById("tShort").value.trim();
+  const cat = document.getElementById("tCat").value;
+  const target = [...document.querySelectorAll("#targetGrid input:checked")].map(el=>el.value);
+  if (!name) return showToast("연수명을 입력해 주세요","warn");
+  if (!short) return showToast("줄임말을 입력해 주세요","warn");
+  if (!target.length) return showToast("대상 직급을 하나 이상 선택해 주세요","warn");
+  if (state.trainings.find(t=>t.name===name)) return showToast("이미 같은 이름의 연수가 있습니다","warn");
+  const id = "t" + Date.now();
+  state.trainings.push({ id, name, short, cat, target });
+  await saveData();
+  document.getElementById("tName").value = "";
+  document.getElementById("tShort").value = "";
+  initTargetGrid();
+  showView("manageTraining");
+  showToast(`'${name}' 연수 추가 완료`,"ok");
+}
+async function removeTraining(tid) {
+  const t = state.trainings.find(x=>x.id===tid);
+  if (!confirm(`'${t?.name||tid}' 연수를 삭제할까요?\n이수 기록도 함께 삭제됩니다.`)) return;
+  state.trainings = state.trainings.filter(x=>x.id!==tid);
+  // 관련 이수 기록 삭제
+  for (const pid of Object.keys(state.completions)) {
+    if (state.completions[pid][tid]) delete state.completions[pid][tid];
+  }
+  await saveData();
+  renderTrainingListEdit();
+  renderAll();
+  showToast("연수 삭제 완료","warn");
+}
+
+/* ── 이수증 업로드 ── */
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById("uploadZone").classList.remove("drag");
+  handleFiles(e.dataTransfer.files);
+}
+async function handleFiles(files) {
+  const log = document.getElementById("uploadLog");
+  for (const file of files) {
+    if (!file.name.endsWith(".pdf")) {
+      log.innerHTML += `<p>⚠ ${file.name}: PDF만 지원됩니다</p>`; continue;
+    }
+    const lid = "l"+Date.now()+Math.random().toString(36).slice(2,5);
+    log.innerHTML += `<p id="${lid}"><span class="spinner"></span> ${file.name} 분석 중...</p>`;
+    log.scrollTop = log.scrollHeight;
+    try {
+      const text = await extractPdf(file);
+      await parseCert(text, file.name, lid);
+    } catch(e) {
+      const el = document.getElementById(lid);
+      if (el) el.outerHTML = `<p style="color:var(--bad-text)">✗ ${file.name}: ${e.message}</p>`;
+    }
+  }
+  await saveData();
+  renderAll();
+}
+async function extractPdf(file) {
+  if (typeof pdfjsLib === "undefined") throw new Error("PDF 라이브러리 로드 실패");
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  const ab = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data:ab}).promise;
+  let text = "";
+  for (let i=1;i<=pdf.numPages;i++) {
+    const pg = await pdf.getPage(i);
+    const ct = await pg.getTextContent();
+    text += ct.items.map(it=>it.str).join(" ") + "\n";
+  }
+  return text;
+}
+async function parseCert(text, filename, lid) {
+  const trainingNames = state.trainings.map(t => t.name).join("\n");
+  const prompt = `한국 교원 원격연수 이수증 텍스트입니다. 아래 JSON만 반환하세요.
+
+{
+  "name": "성명",
+  "date": "이수일(YYYY-MM-DD)",
+  "trainings": ["이수한 연수 이름 목록 — 아래 목록에서 일치하는 것만"]
+}
+
+등록된 연수 목록:
+${trainingNames}
+
+이수증 텍스트:
+${text.slice(0,3000)}`;
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method:"POST",
+    headers:{"Content-Type":"application/json","x-api-key": window.__ANTHROPIC_API_KEY__ || ""},
+    body: JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})
+  });
+  const data = await res.json();
+  const raw = (data.content||[]).map(c=>c.text||"").join("").replace(/```json|```/g,"").trim();
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch(e) { throw new Error("AI 응답 파싱 실패"); }
+  const {name, date, trainings: tNames} = parsed;
+  if (!name) throw new Error("성명 인식 실패");
+  let person = state.staff.find(s=>s.name===name);
+  if (!person) {
+    const id = "s"+Date.now()+Math.random().toString(36).slice(2,5);
+    state.staff.push({id,name,pos:"교사"});
+    person = state.staff[state.staff.length-1];
+  }
+  if (!state.completions[person.id]) state.completions[person.id] = {};
+  const matched = [];
+  for (const tName of (tNames||[])) {
+    const found = state.trainings.find(t => t.name === tName || t.short === tName);
+    if (found && getApplicable(person).find(x=>x.id===found.id)) {
+      state.completions[person.id][found.id] = {
+        date: date||new Date().toISOString().slice(0,10), method:"pdf", source:filename
+      };
+      matched.push(found.short);
+    }
+  }
+  const el = document.getElementById(lid);
+  if (el) el.outerHTML = `<p style="color:var(--ok-text)">✓ ${filename} → ${name} · ${matched.length}개 이수 처리${matched.length?' ('+matched.join(', ')+')':''}</p>`;
+}
+
+/* ── 뷰 전환 ── */
+function showView(name) {
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  const mainViews = ["Staff","Training","Matrix"];
+  if (mainViews.includes(name)) {
+    document.getElementById("view"+name).classList.add("active");
+    currentMainTab = name;
+  } else {
+    // 캐피탈라이즈
+    const id = "view" + name.charAt(0).toUpperCase() + name.slice(1);
+    const el = document.getElementById(id);
+    if (el) {
+      el.classList.add("active");
+      if (name === "manageTraining") renderTrainingListEdit();
+      if (name === "addTraining") initTargetGrid();
+    }
+  }
+}
+function showMainTab() {
+  showView(currentMainTab);
+}
+function switchTab(name, btn) {
+  document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  showView(name);
+}
+
+/* ── 토스트 ── */
+function showToast(msg, type="ok") {
+  const area = document.getElementById("toastArea");
+  const el = document.createElement("div");
+  el.className = "toast";
+  const icon = type==="ok"?"✓":type==="warn"?"⚠":"✗";
+  el.style.borderLeft = `3px solid var(--${type==="ok"?"ok":type==="warn"?"warn":"bad"}-text)`;
+  el.textContent = icon + " " + msg;
+  area.appendChild(el);
+  setTimeout(()=>el.remove(), 3200);
+}
+
+/* ── 전체 렌더 ── */
+function renderAll() {
+  renderStats();
+  renderStaff();
+  renderTraining();
+  renderMatrix();
+  populatePosFilter();
+}
+</script>
+</body>
+</html>
